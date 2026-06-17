@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMDB AutoFill</title>
+  <style>
+    /* Reset and base */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f7fa;
+      color: #1a1a2e;
+    }
+
+    /* App wrapper */
+    #app {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+      border-radius: 16px;
+      padding: 32px 40px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .header-logo { font-size: 2.8rem; line-height: 1; }
+    header h1 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: #fff;
+      margin: 0 0 4px 0;
+      letter-spacing: -0.4px;
+    }
+    .subtitle {
+      color: #94a3b8;
+      margin: 0;
+      font-size: 0.97rem;
+    }
+
+    /* Upload cards */
+    .upload-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 600px) { .upload-cards { grid-template-columns: 1fr; } }
+
+    .upload-card {
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 44px 32px 36px;
+      text-align: center;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    }
+    #dropzone:hover {
+      border-color: #2563eb;
+      box-shadow: 0 4px 20px rgba(37,99,235,0.13);
+    }
+    #dropzone.drag-over {
+      background: #eff6ff;
+      border-color: #2563eb;
+      box-shadow: 0 4px 20px rgba(37,99,235,0.18);
+    }
+    .upload-card-camera:hover {
+      border-color: #16a34a;
+      box-shadow: 0 4px 20px rgba(22,163,74,0.13);
+    }
+    .card-icon { font-size: 3.2rem; line-height: 1; margin-bottom: 4px; }
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin: 0;
+    }
+    .card-desc {
+      color: #64748b;
+      margin: 0;
+      font-size: 0.93rem;
+      line-height: 1.55;
+      max-width: 280px;
+    }
+    .card-hint {
+      color: #94a3b8;
+      font-size: 0.8rem;
+      margin: 0;
+    }
+    .card-hint code {
+      background: #e2e8f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.88em;
+    }
+    .card-btn {
+      border: none;
+      padding: 10px 28px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-top: 6px;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .card-btn:active { transform: scale(0.97); }
+    .card-btn-primary { background: #2563eb; color: #fff; }
+    .card-btn-primary:hover { background: #1d4ed8; }
+    .card-btn-secondary { background: #16a34a; color: #fff; }
+    .card-btn-secondary:hover { background: #15803d; }
+
+    /* How it works strip */
+    .how-it-works {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 4px 0 20px;
+    }
+    .how-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f1f5f9;
+      border-radius: 100px;
+      padding: 7px 18px;
+    }
+    .how-num { font-size: 0.92rem; font-weight: 700; color: #2563eb; }
+    .how-text { font-size: 0.85rem; font-weight: 500; color: #475569; }
+    .how-arrow { color: #cbd5e1; font-size: 1rem; font-weight: 700; }
+
+    /* Progress section */
+    #progress-section {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 40px 24px;
+      text-align: center;
+    }
+    #progress-bar-wrap {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    #progress-bar {
+      height: 100%;
+      background: #2563eb;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    #progress-label {
+      color: #64748b;
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    /* Results section */
+    #results-section {
+      padding: 16px 0;
+    }
+
+    /* Error section */
+    #error-section {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      padding: 16px;
+      color: #991b1b;
+      max-width: 640px;
+      margin: 40px auto;
+    }
+    #error-msg {
+      margin: 0 0 12px 0;
+      font-weight: 500;
+    }
+    #retry-btn {
+      background: #dc2626;
+      color: white;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    #retry-btn:hover {
+      background: #b91c1c;
+    }
+
+    /* Table wrapper — enables horizontal scroll */
+    .results-table-wrapper {
+      overflow-x: auto;
+      margin: 16px 0;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Table base */
+    .results-table {
+      border-collapse: collapse;
+      width: max-content;
+      min-width: 100%;
+      background: #fff;
+      font-size: 0.85rem;
+    }
+    .results-table th,
+    .results-table td {
+      border: 1px solid #e2e8f0;
+      padding: 8px 12px;
+      white-space: nowrap;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .results-table th {
+      background: #1a1a2e;
+      color: #fff;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    /* Sticky first column (ITEM_NAME) */
+    .results-table th:first-child,
+    .results-table td:first-child {
+      position: sticky;
+      left: 0;
+      background-color: #fff;
+      z-index: 1;
+      font-weight: bold;
+      min-width: 180px;
+    }
+    .results-table thead th:first-child {
+      background-color: #1a1a2e;
+      z-index: 2;
+    }
+
+    /* Confidence coloring */
+    .conf-low  { background-color: #ffe0e0 !important; }
+    .conf-medium { background-color: #fff3cd !important; }
+
+    /* Edited cell */
+    .cell-edited { background-color: #dbeafe !important; }
+
+    /* Error row */
+    .row-error td { background-color: #fef2f2; color: #991b1b; font-style: italic; }
+
+    /* Duplicate barcode warning */
+    .dup-badge {
+      display: inline-block;
+      background: #f97316;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      vertical-align: middle;
+      letter-spacing: 0.03em;
+    }
+    .row-duplicate td:first-child { background-color: #fff7ed !important; }
+
+    /* Revert button */
+    .revert-btn {
+      background: none; border: none; cursor: pointer; font-size: 0.9rem;
+      color: #6b7280; padding: 0 2px; vertical-align: middle;
+    }
+    .revert-btn:hover { color: #2563eb; }
+
+    /* Filter toggle */
+    #filter-toggle {
+      background: #fff; border: 1.5px solid #2563eb; color: #2563eb;
+      padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+      margin-bottom: 12px;
+    }
+    #filter-toggle.active { background: #2563eb; color: #fff; }
+
+    /* Export buttons */
+    .export-btn {
+      background: #16a34a; color: #fff; border: none;
+      padding: 8px 20px; border-radius: 6px; cursor: pointer;
+      font-size: 0.95rem; margin-right: 10px; margin-bottom: 16px;
+    }
+    .export-btn:hover { background: #15803d; }
+
+    /* Evaluation section (Plan 04 will populate) */
+    #eval-section { margin-top: 24px; }
+
+    /* Evaluation overall score */
+    #eval-overall {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #16a34a;
+      margin: 16px 0 8px 0;
+    }
+    #eval-subtitle { color: #6b7280; font-size: 0.9rem; margin-bottom: 16px; }
+
+    /* Per-column score row inside table */
+    .score-row th {
+      background: #f0fdf4;
+      color: #16a34a;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-align: center;
+      position: sticky;
+      top: 37px;  /* height of main header row */
+      z-index: 1;
+    }
+    .score-row th:first-child {
+      background: #f0fdf4;
+      z-index: 2;
+    }
+    .score-low  { color: #dc2626; }
+    .score-mid  { color: #d97706; }
+
+    /* Mismatch row highlighting */
+    .row-mismatch td:not(:first-child) { background-color: #fef2f2 !important; }
+    .row-mismatch td:first-child { background-color: #fef2f2 !important; }
+
+    /* Summary stats card */
+    #stats-card {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 12px 0 20px 0;
+    }
+    .stat-tile {
+      flex: 1 1 140px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .stat-tile .stat-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      line-height: 1.1;
+    }
+    .stat-tile .stat-label {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .stat-tile.green .stat-value  { color: #16a34a; }
+    .stat-tile.yellow .stat-value { color: #d97706; }
+    .stat-tile.red .stat-value    { color: #dc2626; }
+    .stat-tile.blue .stat-value   { color: #2563eb; }
+
+    /* Accuracy score card */
+    #accuracy-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    #accuracy-card h3 { margin: 0 0 14px 0; font-size: 1rem; color: #1a1a2e; }
+    .acc-big {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .acc-matched { font-size: 0.85rem; color: #64748b; margin-bottom: 16px; }
+    .field-bars { display: flex; flex-direction: column; gap: 6px; }
+    .field-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+    .field-bar-name { width: 160px; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .field-bar-track { flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .field-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+    .field-bar-pct { width: 36px; text-align: right; color: #374151; font-weight: 600; }
+
+    /* New upload button */
+    #new-upload-btn {
+      background: #fff; border: 1.5px solid #2563eb; color: #2563eb;
+      padding: 7px 18px; border-radius: 6px; cursor: pointer;
+      font-size: 0.9rem; font-weight: 500; float: right; margin-top: 4px;
+    }
+    #new-upload-btn:hover { background: #eff6ff; }
+
+    /* camera-btn is now .card-btn-secondary inside the camera card */
+
+    /* Camera modal overlay */
+    #camera-modal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 1000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 16px;
+      overflow-y: auto;
+    }
+    #camera-modal.open { display: flex; }
+
+    #camera-toolbar {
+      width: 100%; max-width: 680px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+    }
+    #camera-toolbar h2 {
+      color: #fff; font-size: 1.1rem; margin: 0;
+    }
+    #cam-close-btn {
+      background: none; border: 1.5px solid #6b7280; color: #d1d5db;
+      padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+    }
+    #cam-close-btn:hover { border-color: #fff; color: #fff; }
+
+    #camera-video {
+      width: 100%; max-width: 680px;
+      border-radius: 10px;
+      background: #000;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+    }
+
+    #camera-controls {
+      display: flex; gap: 12px; align-items: center;
+      margin-top: 16px;
+    }
+    #capture-btn {
+      width: 68px; height: 68px;
+      border-radius: 50%;
+      background: #fff; border: 5px solid #2563eb;
+      cursor: pointer; font-size: 1.6rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.1s, background 0.1s;
+      flex-shrink: 0;
+    }
+    #capture-btn:active { transform: scale(0.92); background: #dbeafe; }
+    #flip-btn {
+      background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.3);
+      color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 1.2rem;
+    }
+    #flip-btn:hover { background: rgba(255,255,255,0.2); }
+
+    /* Captured photos strip */
+    #cam-previews-wrap {
+      width: 100%; max-width: 680px;
+      margin-top: 16px;
+    }
+    #cam-previews-label {
+      color: #9ca3af; font-size: 0.82rem; margin-bottom: 8px;
+    }
+    #cam-previews {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .cam-thumb {
+      position: relative; width: 72px; height: 72px;
+    }
+    .cam-thumb img {
+      width: 100%; height: 100%; object-fit: cover;
+      border-radius: 6px; border: 2px solid #374151;
+    }
+    .cam-thumb-remove {
+      position: absolute; top: -6px; right: -6px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #dc2626; color: #fff;
+      border: none; cursor: pointer;
+      font-size: 0.7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+
+    #cam-upload-btn {
+      background: #16a34a; color: #fff; border: none;
+      padding: 6px 18px; border-radius: 6px; cursor: pointer;
+      font-size: 0.9rem; font-weight: 600;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    #cam-upload-btn:hover:not(:disabled) { background: #15803d; }
+    #cam-upload-btn:disabled { background: #4b5563; cursor: not-allowed; opacity: 0.6; }
+
+    #cam-error {
+      color: #fca5a5; font-size: 0.88rem; margin-top: 12px; text-align: center;
+    }
+
+    /* ── Chat bubble & window ── */
+    #chat-bubble {
+      position: fixed; bottom: 24px; right: 24px;
+      width: 54px; height: 54px; border-radius: 50%;
+      background: #2563eb; color: #fff; border: none;
+      cursor: pointer; font-size: 1.5rem;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 18px rgba(37,99,235,0.45);
+      z-index: 950; transition: transform 0.2s, background 0.2s;
+    }
+    #chat-bubble:hover { background: #1d4ed8; transform: scale(1.08); }
+
+    #chat-window {
+      position: fixed; bottom: 90px; right: 24px;
+      width: 360px;
+      height: 500px;
+      max-height: calc(100vh - 110px);
+      min-height: 280px;
+      background: #fff; border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+      display: flex; flex-direction: column;
+      z-index: 950; overflow: hidden;
+      transform: scale(0.95) translateY(10px);
+      opacity: 0; pointer-events: none;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    #chat-window.open {
+      transform: scale(1) translateY(0);
+      opacity: 1; pointer-events: auto;
+    }
+    @media (max-width: 420px) {
+      #chat-window {
+        width: calc(100vw - 16px);
+        right: 8px;
+        bottom: 82px;
+        max-height: calc(100vh - 100px);
+      }
+    }
+
+    #chat-header {
+      background: #1a1a2e; color: #fff;
+      padding: 13px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    #chat-header-title {
+      font-weight: 600; font-size: 0.93rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    #chat-header-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #22c55e; flex-shrink: 0;
+    }
+    #chat-close {
+      background: none; border: none; color: #9ca3af;
+      cursor: pointer; font-size: 1rem; padding: 0; line-height: 1;
+    }
+    #chat-close:hover { color: #fff; }
+
+    #chat-messages {
+      flex: 1; overflow-y: auto;
+      padding: 14px 14px 6px; display: flex;
+      flex-direction: column; gap: 8px;
+    }
+    .chat-msg {
+      max-width: 86%; padding: 10px 14px;
+      border-radius: 14px; font-size: 0.9rem;
+      line-height: 1.55; word-break: break-word;
+    }
+    .chat-msg-user {
+      background: #2563eb; color: #fff;
+      align-self: flex-end; border-bottom-right-radius: 4px;
+    }
+    .chat-msg-assistant {
+      background: #f1f5f9; color: #1e293b;
+      align-self: flex-start; border-bottom-left-radius: 4px;
+    }
+    .chat-msg-typing {
+      background: #e2e8f0; color: #475569;
+      align-self: flex-start; font-style: italic;
+      border-bottom-left-radius: 4px;
+    }
+
+    #chat-input-row {
+      padding: 10px 12px; border-top: 1px solid #e2e8f0;
+      display: flex; gap: 8px; flex-shrink: 0; align-items: flex-end;
+    }
+    #chat-input {
+      flex: 1; border: 1.5px solid #e2e8f0; border-radius: 10px;
+      padding: 8px 12px; font-size: 0.875rem;
+      outline: none; resize: none; font-family: inherit;
+      max-height: 100px; line-height: 1.4;
+    }
+    #chat-input:focus { border-color: #2563eb; }
+    #chat-send {
+      background: #2563eb; color: #fff; border: none;
+      border-radius: 10px; padding: 8px 14px;
+      cursor: pointer; font-size: 0.875rem; font-weight: 600;
+      flex-shrink: 0; transition: background 0.15s;
+    }
+    #chat-send:hover { background: #1d4ed8; }
+    #chat-send:disabled { background: #94a3b8; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="header-logo">&#128230;</div>
+      <div>
+        <h1>IMDB AutoFill</h1>
+        <p class="subtitle">Automated product catalog extraction from images</p>
+      </div>
+    </header>
+
+    <!-- Upload section -->
+    <section id="upload-section">
+      <input type="file" id="file-input" multiple accept="image/*,.csv" style="display:none">
+      <div class="upload-cards">
+        <!-- Upload files card (also the drag-drop zone) -->
+        <div id="dropzone" class="upload-card">
+          <div class="card-icon">&#128193;</div>
+          <h2 class="card-title">Upload Files</h2>
+          <p class="card-desc">Drag &amp; drop product images here, or browse from your device</p>
+          <p class="card-hint">Include <code>ground_truth.csv</code> to see accuracy scores</p>
+          <button id="browse-btn" type="button" class="card-btn card-btn-primary">Browse Files</button>
+        </div>
+        <!-- Camera card -->
+        <div class="upload-card upload-card-camera">
+          <div class="card-icon">&#128247;</div>
+          <h2 class="card-title">Use Camera</h2>
+          <p class="card-desc">Point your camera at product labels to capture and extract data instantly</p>
+          <button id="camera-btn" type="button" class="card-btn card-btn-secondary">Open Camera</button>
+        </div>
+      </div>
+      <!-- How it works -->
+      <div class="how-it-works">
+        <div class="how-step"><span class="how-num">①</span><span class="how-text">Upload images</span></div>
+        <span class="how-arrow">→</span>
+        <div class="how-step"><span class="how-num">②</span><span class="how-text">AI reads labels</span></div>
+        <span class="how-arrow">→</span>
+        <div class="how-step"><span class="how-num">③</span><span class="how-text">Export CSV / XLSX</span></div>
+      </div>
+    </section>
+
+    <!-- Camera modal -->
+    <div id="camera-modal" role="dialog" aria-modal="true" aria-label="Camera capture">
+      <div id="camera-toolbar">
+        <h2>&#128247; Capture Product Photos</h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="cam-close-btn" type="button">Cancel</button>
+          <button id="cam-upload-btn" type="button" disabled>Upload Photos</button>
+        </div>
+      </div>
+      <video id="camera-video" autoplay playsinline muted></video>
+      <div id="camera-controls">
+        <button id="flip-btn" type="button" title="Flip camera">&#8635;</button>
+        <button id="capture-btn" type="button" title="Take photo">&#9711;</button>
+      </div>
+      <div id="cam-previews-wrap">
+        <div id="cam-previews-label">Captured photos: <span id="cam-count">0</span></div>
+        <div id="cam-previews"></div>
+      </div>
+      <p id="cam-error"></p>
+      <canvas id="cam-canvas" style="display:none"></canvas>
+    </div>
+
+    <!-- Progress section (hidden until job starts) -->
+    <section id="progress-section" style="display:none">
+      <div id="progress-bar-wrap">
+        <div id="progress-bar"></div>
+      </div>
+      <p id="progress-label">Starting...</p>
+    </section>
+
+    <!-- Results section (hidden until job done) -->
+    <section id="results-section" style="display:none">
+      <!-- Plan 03 will populate this -->
+    </section>
+
+    <!-- Error section (hidden until error) -->
+    <section id="error-section" style="display:none">
+      <p id="error-msg"></p>
+      <button id="retry-btn" type="button">Try Again</button>
+    </section>
+  </div>
+
+  <!-- ── Floating chat bubble ── -->
+  <button id="chat-bubble" title="Product Assistant">&#128172;</button>
+
+  <!-- ── Chat window ── -->
+  <div id="chat-window" role="dialog" aria-label="Product Assistant">
+    <div id="chat-header">
+      <div id="chat-header-title">
+        <span id="chat-header-dot"></span>
+        Product Assistant
+      </div>
+      <button id="chat-close" title="Close">&#10005;</button>
+    </div>
+    <div id="chat-messages">
+      <div class="chat-msg chat-msg-assistant">
+        Hi! Ask me anything about your products — brands, manufacturers, countries, weights, counts, and more. Upload some images first to get started!
+      </div>
+    </div>
+    <div id="chat-input-row">
+      <textarea id="chat-input" placeholder="Ask about your products…" rows="1"></textarea>
+      <button id="chat-send">Send</button>
+    </div>
+  </div>
+  <script>
+    // App state
+    let currentJobId = null;
+    let pollId = null;
+    let currentResults = null;
+    let pendingGroundTruth = null;  // stores dropped ground_truth.csv File object
+
+    // -------------------------------------------------------------------------
+    // Section management
+    // -------------------------------------------------------------------------
+    function showSection(name) {
+      ['upload', 'progress', 'results', 'error'].forEach(s => {
+        document.getElementById(s + '-section').style.display = 'none';
+      });
+      document.getElementById(name + '-section').style.display = 'block';
+    }
+
+    // -------------------------------------------------------------------------
+    // handleFiles — separate ground truth CSV from images
+    // -------------------------------------------------------------------------
+    function handleFiles(files) {
+      const imageFiles = [];
+      let gtFile = null;
+      for (const f of files) {
+        if (f.name.toLowerCase() === 'ground_truth.csv') {
+          gtFile = f;
+        } else if (f.type.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/i.test(f.name)) {
+          imageFiles.push(f);
+        }
+      }
+      if (gtFile) pendingGroundTruth = gtFile;
+      if (imageFiles.length > 0) {
+        startJob(imageFiles);
+      } else if (gtFile && currentResults) {
+        // Ground truth dropped after results are ready — trigger evaluation
+        runClientEval(gtFile);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // startJob — upload images and begin polling
+    // -------------------------------------------------------------------------
+    async function startJob(imageFiles) {
+      if (pollId) { clearTimeout(pollId); pollId = null; }
+      showSection('progress');
+      document.getElementById('progress-label').textContent = 'Uploading...';
+      document.getElementById('progress-bar').style.width = '0%';
+
+      try {
+        const fd = new FormData();
+        imageFiles.forEach(f => fd.append('files', f, f.name));
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+        const { job_id } = await res.json();
+        currentJobId = job_id;
+        startPolling(job_id);
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // startPolling — exponential backoff (2s→4s→8s), gives up after 10 errors
+    // -------------------------------------------------------------------------
+    function startPolling(job_id) {
+      if (pollId) clearInterval(pollId);
+      let interval = 2000;
+      let errorCount = 0;
+      const MAX_ERRORS = 10;
+
+      async function tick() {
+        try {
+          const res = await fetch(`/status/${job_id}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const s = await res.json();
+          errorCount = 0;  // reset on success
+
+          const pct = s.total > 0 ? Math.round((s.processed / s.total) * 100) : 0;
+          document.getElementById('progress-bar').style.width = pct + '%';
+          document.getElementById('progress-label').textContent =
+            s.total > 0
+              ? `Processing ${s.processed} of ${s.total} products...`
+              : 'Processing...';
+
+          if (s.status === 'done') {
+            clearTimeout(pollId); pollId = null;
+            await loadResults(job_id);
+            return;
+          } else if (s.status === 'error') {
+            clearTimeout(pollId); pollId = null;
+            showError(s.error || 'Extraction failed');
+            return;
+          }
+        } catch (err) {
+          errorCount++;
+          console.warn(`Poll error (${errorCount}/${MAX_ERRORS}):`, err);
+          if (errorCount >= MAX_ERRORS) {
+            clearTimeout(pollId); pollId = null;
+            showError('Lost connection to server. Please refresh and try again.');
+            return;
+          }
+          // Back off — double the interval, cap at 30s
+          interval = Math.min(interval * 2, 30000);
+        }
+        pollId = setTimeout(tick, interval);
+      }
+
+      pollId = setTimeout(tick, interval);
+    }
+
+    // -------------------------------------------------------------------------
+    // loadResults — fetch and render results when job is done
+    // -------------------------------------------------------------------------
+    async function loadResults(job_id) {
+      try {
+        const r = await fetch(`/results/${job_id}`);
+        if (!r.ok) throw new Error(`Results error: ${r.status}`);
+        const { results, elapsed_seconds } = await r.json();
+        currentResults = results;
+        renderResults(results, elapsed_seconds);
+        showSection('results');
+        // If ground truth was already dropped, trigger evaluation
+        if (pendingGroundTruth) runClientEval(pendingGroundTruth);
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // showError — display error section
+    // -------------------------------------------------------------------------
+    function showError(msg) {
+      document.getElementById('error-msg').textContent = 'Error: ' + msg;
+      showSection('error');
+    }
+
+    // -------------------------------------------------------------------------
+    // renderResults — full preview table (Plan 03)
+    // -------------------------------------------------------------------------
+    function renderResults(results, elapsedSeconds) {
+      const section = document.getElementById('results-section');
+
+      // Build column list dynamically from first result to avoid hardcoding field names
+      // This automatically handles PACKAGING  TYPE (two spaces) from backend
+      const columns = results.length > 0 ? Object.keys(results[0].fields) : [];
+
+      // --- Export buttons ---
+      const exportDiv = document.createElement('div');
+      exportDiv.id = 'export-buttons';
+      const csvBtn = document.createElement('button');
+      csvBtn.className = 'export-btn';
+      csvBtn.textContent = 'Download CSV';
+      csvBtn.addEventListener('click', () => {
+        window.location.href = `/export/${currentJobId}/csv`;
+      });
+      const xlsxBtn = document.createElement('button');
+      xlsxBtn.className = 'export-btn';
+      xlsxBtn.textContent = 'Download XLSX';
+      xlsxBtn.addEventListener('click', () => {
+        window.location.href = `/export/${currentJobId}/xlsx`;
+      });
+      exportDiv.appendChild(csvBtn);
+      exportDiv.appendChild(xlsxBtn);
+
+      // --- Filter toggle ---
+      const filterBtn = document.createElement('button');
+      filterBtn.id = 'filter-toggle';
+      filterBtn.textContent = 'Show low confidence only';
+      let filterActive = false;
+      filterBtn.addEventListener('click', () => {
+        filterActive = !filterActive;
+        filterBtn.classList.toggle('active', filterActive);
+        applyFilter(filterActive);
+      });
+
+      // --- Table wrapper ---
+      const wrapper = document.createElement('div');
+      wrapper.className = 'results-table-wrapper';
+      const table = document.createElement('table');
+      table.className = 'results-table';
+      table.id = 'results-table';
+
+      // --- Header row ---
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      columns.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col;  // textContent — safe against XSS
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // --- Duplicate barcode detection ---
+      // Build a map of barcode -> list of row indices that share it
+      const barcodeMap = {};
+      results.forEach((item, i) => {
+        const bc = (item.fields['BARCODE'] || '').trim();
+        if (!bc) return;
+        if (!barcodeMap[bc]) barcodeMap[bc] = [];
+        barcodeMap[bc].push(i);
+      });
+      // Set of row indices that are duplicates
+      const dupRows = new Set();
+      Object.values(barcodeMap).forEach(indices => {
+        if (indices.length > 1) indices.forEach(i => dupRows.add(i));
+      });
+
+      // --- Body rows ---
+      const tbody = document.createElement('tbody');
+      results.forEach((item, rowIndex) => {
+        const tr = document.createElement('tr');
+        tr.dataset.rowIndex = rowIndex;
+
+        const isDuplicate = dupRows.has(rowIndex);
+        if (isDuplicate) tr.classList.add('row-duplicate');
+
+        // Mark error rows (all fields empty except ITEM_NAME = product key from failed extraction)
+        const isError = Object.entries(item.fields)
+          .filter(([k]) => k !== 'ITEM_NAME')
+          .every(([, v]) => v === '');
+        if (isError) tr.classList.add('row-error');
+
+        columns.forEach(col => {
+          const td = document.createElement('td');
+          td.textContent = item.fields[col] || '';  // textContent — safe
+
+          // Duplicate badge on BARCODE cell
+          if (isDuplicate && col === 'BARCODE' && (item.fields[col] || '').trim()) {
+            const badge = document.createElement('span');
+            badge.className = 'dup-badge';
+            badge.title = 'This barcode appears on multiple products';
+            badge.textContent = 'DUP';
+            td.appendChild(badge);
+          }
+
+          // Confidence coloring (only for non-error rows)
+          if (!isError && item.confidence) {
+            const conf = item.confidence[col];
+            if (conf === 'low') td.classList.add('conf-low');
+            else if (conf === 'medium') td.classList.add('conf-medium');
+          }
+
+          // Make editable (all columns editable per UI-06)
+          makeEditable(td, item, col);
+
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      wrapper.appendChild(table);
+
+      // --- Assemble section ---
+      section.innerHTML = '';  // clear previous
+      const h2 = document.createElement('h2');
+      const timeLabel = elapsedSeconds
+        ? ` — extracted in ${elapsedSeconds.toFixed(1)}s`
+        : '';
+      h2.textContent = `Results — ${results.length} products${timeLabel}`;
+
+      const newUploadBtn = document.createElement('button');
+      newUploadBtn.id = 'new-upload-btn';
+      newUploadBtn.textContent = '+ New Upload';
+      newUploadBtn.addEventListener('click', () => {
+        if (pollId) { clearTimeout(pollId); pollId = null; }
+        currentJobId = null;
+        currentResults = null;
+        pendingGroundTruth = null;
+        document.getElementById('file-input').value = '';
+        showSection('upload');
+      });
+      h2.appendChild(newUploadBtn);
+
+      // --- Stats card ---
+      const statsCard = document.createElement('div');
+      statsCard.id = 'stats-card';
+      renderStatsCard(statsCard, results);
+
+      section.appendChild(h2);
+      section.appendChild(statsCard);
+      section.appendChild(exportDiv);
+      section.appendChild(filterBtn);
+      section.appendChild(wrapper);
+
+      // Placeholder div for evaluation scores (Plan 04)
+      const evalDiv = document.createElement('div');
+      evalDiv.id = 'eval-section';
+      section.appendChild(evalDiv);
+    }
+
+    // -------------------------------------------------------------------------
+    // renderStatsCard — summary tiles (products, high/medium/low confidence)
+    // -------------------------------------------------------------------------
+    function renderStatsCard(container, results) {
+      const columns = results.length > 0 ? Object.keys(results[0].fields) : [];
+      let highCells = 0, medCells = 0, totalCells = 0;
+      let emptyFields = 0;
+
+      results.forEach(item => {
+        columns.forEach(col => {
+          totalCells++;
+          const conf = item.confidence && item.confidence[col];
+          if (conf === 'high') highCells++;
+          else if (conf === 'medium') medCells++;
+          if (!(item.fields[col] || '').trim()) emptyFields++;
+        });
+      });
+
+      const highPct = totalCells ? Math.round(highCells / totalCells * 100) : 0;
+
+      // Duplicate barcode count
+      const bcMap = {};
+      results.forEach(item => {
+        const bc = (item.fields['BARCODE'] || '').trim();
+        if (bc) bcMap[bc] = (bcMap[bc] || 0) + 1;
+      });
+      const dupCount = Object.values(bcMap).filter(n => n > 1).reduce((s, n) => s + n, 0);
+
+      function tile(value, label, colorClass) {
+        const div = document.createElement('div');
+        div.className = `stat-tile ${colorClass}`;
+        div.innerHTML = `<div class="stat-value">${value}</div><div class="stat-label">${label}</div>`;
+        return div;
+      }
+
+      container.appendChild(tile(results.length, 'Products found', 'blue'));
+      container.appendChild(tile(highPct + '%', 'High confidence', 'green'));
+      container.appendChild(tile(emptyFields, 'Empty fields', emptyFields === 0 ? 'green' : 'red'));
+      container.appendChild(tile(dupCount, 'Duplicate barcodes', dupCount === 0 ? 'green' : 'red'));
+    }
+
+    // applyFilter — show only rows with at least one low-confidence cell
+    function applyFilter(active) {
+      const rows = document.querySelectorAll('#results-table tbody tr');
+      rows.forEach(tr => {
+        if (!active) {
+          tr.style.display = '';
+        } else {
+          const hasLow = tr.querySelector('.conf-low') !== null;
+          tr.style.display = hasLow ? '' : 'none';
+        }
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // makeEditable — inline cell editing with revert (Plan 03)
+    // -------------------------------------------------------------------------
+    function makeEditable(td, resultObj, fieldName) {
+      td.contentEditable = 'true';
+      td.dataset.original = td.textContent;
+
+      td.addEventListener('focus', () => {
+        // Store original on first focus
+        if (!td.dataset.original) td.dataset.original = td.textContent;
+      });
+
+      td.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();  // CRITICAL: prevent <div> insertion in contenteditable
+          td.blur();
+        }
+        if (e.key === 'Escape') {
+          td.textContent = td.dataset.original;
+          td.classList.remove('cell-edited');
+          removeRevertBtn(td);
+          td.blur();
+        }
+      });
+
+      td.addEventListener('blur', () => {
+        const newVal = td.textContent.trim();
+        resultObj.fields[fieldName] = newVal;  // update in-memory results
+        if (newVal !== td.dataset.original) {
+          td.classList.add('cell-edited');
+          showRevertBtn(td, fieldName, resultObj);
+        }
+      });
+    }
+
+    function showRevertBtn(td, fieldName, resultObj) {
+      removeRevertBtn(td);  // avoid duplicate
+      const btn = document.createElement('button');
+      btn.className = 'revert-btn';
+      btn.title = 'Revert to original';
+      btn.textContent = '↺';  // ↺
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        td.textContent = td.dataset.original;
+        resultObj.fields[fieldName] = td.dataset.original;
+        td.classList.remove('cell-edited');
+        removeRevertBtn(td);
+      });
+      td.appendChild(btn);
+    }
+
+    function removeRevertBtn(td) {
+      const existing = td.querySelector('.revert-btn');
+      if (existing) existing.remove();
+    }
+
+    // -------------------------------------------------------------------------
+    // parseCSV — minimal RFC 4180 quoted-field parser
+    // -------------------------------------------------------------------------
+    function parseCSV(text) {
+      // Handles quoted fields containing commas (e.g., TAGLINE values)
+      const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n');
+      if (lines.length < 2) return [];
+
+      function parseLine(line) {
+        const fields = [];
+        let inQuotes = false, cur = '';
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i+1] === '"') { cur += '"'; i++; }  // escaped quote
+            else inQuotes = !inQuotes;
+          } else if (ch === ',' && !inQuotes) {
+            fields.push(cur.trim()); cur = '';
+          } else {
+            cur += ch;
+          }
+        }
+        fields.push(cur.trim());
+        return fields;
+      }
+
+      const headers = parseLine(lines[0]);
+      return lines.slice(1)
+        .filter(l => l.trim())
+        .map(line => {
+          const vals = parseLine(line);
+          return Object.fromEntries(headers.map((h, i) => [h, vals[i] || '']));
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // renderEvaluation — compute accuracy and render UI
+    // -------------------------------------------------------------------------
+    function renderEvaluation(gtRows, results) {
+      // Build lookups — case-insensitive ITEM_NAME join
+      const gtByName = {};
+      gtRows.forEach(r => {
+        const key = (r['ITEM_NAME'] || '').trim().toUpperCase();
+        if (key) gtByName[key] = r;
+      });
+
+      const columns = results.length > 0 ? Object.keys(results[0].fields) : [];
+      const counts = {};
+      columns.forEach(col => { counts[col] = { correct: 0, total: 0 }; });
+      const rowMismatches = new Array(results.length).fill(0);
+
+      results.forEach((item, i) => {
+        const predName = (item.fields['ITEM_NAME'] || '').trim().toUpperCase();
+        const gtRow = gtByName[predName];
+        if (!gtRow) return;
+        columns.forEach(col => {
+          const predVal = (item.fields[col] || '').trim().toUpperCase();
+          const gtVal   = (gtRow[col] || '').trim().toUpperCase();
+          counts[col].total++;
+          if (predVal === gtVal) counts[col].correct++;
+          else rowMismatches[i]++;
+        });
+      });
+
+      const totalCorrect = columns.reduce((s, c) => s + counts[c].correct, 0);
+      const totalCells   = columns.reduce((s, c) => s + counts[c].total, 0);
+      const overall = totalCells > 0 ? (totalCorrect / totalCells * 100).toFixed(1) : '0.0';
+      const overallNum = parseFloat(overall);
+
+      const matched = results.filter(item => {
+        const k = (item.fields['ITEM_NAME'] || '').trim().toUpperCase();
+        return !!gtByName[k];
+      }).length;
+
+      // --- Accuracy card ---
+      const evalDiv = document.getElementById('eval-section');
+      evalDiv.innerHTML = '';
+
+      const card = document.createElement('div');
+      card.id = 'accuracy-card';
+
+      const cardTitle = document.createElement('h3');
+      cardTitle.textContent = 'Accuracy vs Ground Truth';
+      card.appendChild(cardTitle);
+
+      const bigScore = document.createElement('div');
+      bigScore.className = 'acc-big';
+      bigScore.textContent = overall + '%';
+      bigScore.style.color = overallNum >= 90 ? '#16a34a' : overallNum >= 70 ? '#d97706' : '#dc2626';
+      card.appendChild(bigScore);
+
+      const matchedLine = document.createElement('div');
+      matchedLine.className = 'acc-matched';
+      matchedLine.textContent = `${matched} of ${results.length} products matched to ground truth`;
+      card.appendChild(matchedLine);
+
+      // Per-field bars (skip ITEM_NAME — it's the join key)
+      const barsDiv = document.createElement('div');
+      barsDiv.className = 'field-bars';
+      columns.filter(c => c !== 'ITEM_NAME').forEach(col => {
+        const cnt = counts[col];
+        if (cnt.total === 0) return;
+        const pct = Math.round(cnt.correct / cnt.total * 100);
+        const color = pct >= 90 ? '#16a34a' : pct >= 70 ? '#d97706' : '#dc2626';
+
+        const row = document.createElement('div');
+        row.className = 'field-bar-row';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'field-bar-name';
+        nameSpan.title = col;
+        nameSpan.textContent = col;
+
+        const track = document.createElement('div');
+        track.className = 'field-bar-track';
+        const fill = document.createElement('div');
+        fill.className = 'field-bar-fill';
+        fill.style.width = pct + '%';
+        fill.style.background = color;
+        track.appendChild(fill);
+
+        const pctSpan = document.createElement('span');
+        pctSpan.className = 'field-bar-pct';
+        pctSpan.style.color = color;
+        pctSpan.textContent = pct + '%';
+
+        row.appendChild(nameSpan);
+        row.appendChild(track);
+        row.appendChild(pctSpan);
+        barsDiv.appendChild(row);
+      });
+      card.appendChild(barsDiv);
+      evalDiv.appendChild(card);
+
+      // --- Per-column score row in table header ---
+      const table = document.getElementById('results-table');
+      if (table) {
+        const prev = table.querySelector('.score-row');
+        if (prev) prev.remove();
+
+        const scoreRow = document.createElement('tr');
+        scoreRow.className = 'score-row';
+        columns.forEach(col => {
+          const th = document.createElement('th');
+          const cnt = counts[col];
+          if (cnt.total > 0) {
+            const pct = (cnt.correct / cnt.total * 100).toFixed(0);
+            th.textContent = pct + '%';
+            const n = parseInt(pct);
+            if (n < 70) th.classList.add('score-low');
+            else if (n < 90) th.classList.add('score-mid');
+          } else {
+            th.textContent = '—';
+          }
+          scoreRow.appendChild(th);
+        });
+        table.querySelector('thead').appendChild(scoreRow);
+
+        // Highlight worst rows
+        const maxMismatches = Math.max(...rowMismatches);
+        const threshold = Math.max(3, maxMismatches * 0.5);
+        table.querySelectorAll('tbody tr').forEach((tr, i) => {
+          if (rowMismatches[i] >= threshold) tr.classList.add('row-mismatch');
+        });
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // runClientEval — FileReader-based CSV parse + evaluation trigger
+    // -------------------------------------------------------------------------
+    function runClientEval(file) {
+      // Guard: results must be ready
+      if (!currentResults || currentResults.length === 0) {
+        pendingGroundTruth = file;  // store for later
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const gtRows = parseCSV(e.target.result);
+          renderEvaluation(gtRows, currentResults);
+        } catch (err) {
+          console.error('Evaluation error:', err);
+          const evalDiv = document.getElementById('eval-section');
+          if (evalDiv) {
+            evalDiv.innerHTML = '<p style="color:#dc2626">Evaluation failed: ' + err.message + '</p>';
+          }
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // -------------------------------------------------------------------------
+    // Camera capture
+    // -------------------------------------------------------------------------
+    let cameraStream = null;
+    let cameraFacingMode = 'environment';  // start with back camera
+    let capturedFiles = [];
+
+    async function openCamera() {
+      const modal = document.getElementById('camera-modal');
+      const video = document.getElementById('camera-video');
+      const errEl = document.getElementById('cam-error');
+      errEl.textContent = '';
+      capturedFiles = [];
+      updateCameraPreviews();
+
+      // getUserMedia requires localhost or HTTPS — give a clear message if not available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert(
+          'Camera not available.\n\n' +
+          'Make sure you open the app at http://localhost:8000 (not an IP address like 192.168.x.x).\n\n' +
+          'Browsers block camera access on non-secure HTTP addresses.'
+        );
+        return;
+      }
+
+      // Try with preferred facingMode first, fall back to any available camera
+      const attempts = [
+        { video: { facingMode: cameraFacingMode, width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false },
+        { video: true, audio: false },
+      ];
+
+      for (const constraints of attempts) {
+        try {
+          cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+          video.srcObject = cameraStream;
+          modal.classList.add('open');
+          // Hide flip if we fell back to a generic constraint (single-camera device)
+          if (constraints.video === true) {
+            document.getElementById('flip-btn').style.display = 'none';
+          }
+          return;
+        } catch (err) {
+          if (err.name === 'NotAllowedError') {
+            alert(
+              'Camera permission denied.\n\n' +
+              'To fix: click the camera/lock icon in your browser address bar → allow camera access → refresh the page.'
+            );
+            return;
+          }
+          if (err.name === 'NotFoundError') {
+            alert('No camera found on this device.');
+            return;
+          }
+          // Any other error — try next constraint set
+        }
+      }
+
+      alert('Could not start the camera. Make sure no other app is using it and try again.');
+    }
+
+    function closeCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+      }
+      document.getElementById('camera-video').srcObject = null;
+      document.getElementById('camera-modal').classList.remove('open');
+      document.getElementById('flip-btn').style.display = '';
+    }
+
+    async function flipCamera() {
+      cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+      }
+      const video = document.getElementById('camera-video');
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: cameraFacingMode, width: { ideal: 1280 }, height: { ideal: 960 } },
+          audio: false,
+        });
+        video.srcObject = cameraStream;
+      } catch (err) {
+        document.getElementById('cam-error').textContent = 'Could not switch camera.';
+      }
+    }
+
+    function capturePhoto() {
+      const video = document.getElementById('camera-video');
+      const canvas = document.getElementById('cam-canvas');
+      const errEl  = document.getElementById('cam-error');
+      const captureBtn = document.getElementById('capture-btn');
+
+      // Visual flash feedback so the user knows the shutter fired
+      captureBtn.style.opacity = '0.2';
+      setTimeout(() => { captureBtn.style.opacity = '1'; }, 180);
+
+      canvas.width  = video.videoWidth  || 1280;
+      canvas.height = video.videoHeight || 960;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(blob => {
+        if (!blob) {
+          // toBlob failed — fall back to toDataURL
+          try {
+            const dataURL = canvas.toDataURL('image/jpeg', 0.92);
+            const parts = dataURL.split(',');
+            const bytes = atob(parts[1]);
+            const arr = new Uint8Array(bytes.length);
+            for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+            blob = new Blob([arr], { type: 'image/jpeg' });
+          } catch (e) {
+            errEl.textContent = 'Could not capture photo — try again.';
+            return;
+          }
+        }
+        errEl.textContent = '';
+        const filename = `photo_${Date.now()}_${capturedFiles.length + 1}.jpg`;
+        const file = new File([blob], filename, { type: 'image/jpeg' });
+        capturedFiles.push(file);
+        updateCameraPreviews();
+      }, 'image/jpeg', 0.92);
+    }
+
+    function updateCameraPreviews() {
+      const container = document.getElementById('cam-previews');
+      const countEl   = document.getElementById('cam-count');
+      const uploadBtn = document.getElementById('cam-upload-btn');
+      container.innerHTML = '';
+      countEl.textContent = capturedFiles.length;
+      uploadBtn.disabled = capturedFiles.length === 0;
+      uploadBtn.textContent = capturedFiles.length > 0
+        ? `Upload ${capturedFiles.length} Photo${capturedFiles.length > 1 ? 's' : ''}`
+        : 'Upload Photos';
+
+      capturedFiles.forEach((file, idx) => {
+        const url = URL.createObjectURL(file);
+        const wrap = document.createElement('div');
+        wrap.className = 'cam-thumb';
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = `Photo ${idx + 1}`;
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'cam-thumb-remove';
+        rmBtn.title = 'Remove';
+        rmBtn.textContent = '×';
+        rmBtn.addEventListener('click', () => {
+          URL.revokeObjectURL(url);
+          capturedFiles.splice(idx, 1);
+          updateCameraPreviews();
+        });
+        wrap.appendChild(img);
+        wrap.appendChild(rmBtn);
+        container.appendChild(wrap);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // Event wiring
+    // -------------------------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', () => {
+      const dropzone = document.getElementById('dropzone');
+      const fileInput = document.getElementById('file-input');
+      const browseBtn = document.getElementById('browse-btn');
+      const retryBtn  = document.getElementById('retry-btn');
+
+      // Prevent browser opening files dropped outside dropzone
+      window.addEventListener('dragover', e => e.preventDefault());
+      window.addEventListener('drop', e => e.preventDefault());
+
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        dropzone.classList.add('drag-over');
+      });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('drag-over');
+        const files = [...e.dataTransfer.items].map(item => item.getAsFile()).filter(Boolean);
+        handleFiles(files);
+      });
+
+      browseBtn.addEventListener('click', () => fileInput.click());
+      dropzone.addEventListener('click', (e) => {
+        if (e.target !== browseBtn)
+          fileInput.click();
+      });
+      fileInput.addEventListener('change', () => {
+        handleFiles([...fileInput.files]);
+        fileInput.value = '';
+      });
+
+      retryBtn.addEventListener('click', () => showSection('upload'));
+
+      // Camera wiring
+      document.getElementById('camera-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openCamera();
+      });
+      document.getElementById('cam-close-btn').addEventListener('click', closeCamera);
+      document.getElementById('capture-btn').addEventListener('click', capturePhoto);
+      document.getElementById('flip-btn').addEventListener('click', flipCamera);
+      document.getElementById('cam-upload-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (capturedFiles.length === 0) return;
+        const files = [...capturedFiles];
+        capturedFiles = [];
+        closeCamera();
+        handleFiles(files);
+      });
+
+      // Close modal on backdrop click
+      document.getElementById('camera-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('camera-modal')) closeCamera();
+      });
+
+      // Close modal on Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('camera-modal').classList.contains('open'))
+          closeCamera();
+      });
+
+      // ── Chat ──────────────────────────────────────────────────────────────
+      let chatHistory = [];
+      let chatIsOpen = false;
+
+      function toggleChat() {
+        chatIsOpen = !chatIsOpen;
+        document.getElementById('chat-window').classList.toggle('open', chatIsOpen);
+        if (chatIsOpen) document.getElementById('chat-input').focus();
+      }
+
+      function appendChat(role, text) {
+        const msgs = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = `chat-msg chat-msg-${role}`;
+        div.textContent = text;
+        msgs.appendChild(div);
+        msgs.scrollTop = msgs.scrollHeight;
+        return div;
+      }
+
+      async function sendChat() {
+        const input = document.getElementById('chat-input');
+        const msg = input.value.trim();
+        if (!msg) return;
+
+        input.value = '';
+        input.style.height = 'auto';
+        appendChat('user', msg);
+        chatHistory.push({ role: 'user', content: msg });
+
+        const typingEl = appendChat('typing', 'Thinking…');
+        document.getElementById('chat-send').disabled = true;
+
+        try {
+          const res = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: chatHistory, job_id: currentJobId }),
+          });
+          if (!res.ok) throw new Error('Chat error');
+          const { reply } = await res.json();
+          typingEl.remove();
+          appendChat('assistant', reply);
+          chatHistory.push({ role: 'assistant', content: reply });
+        } catch {
+          typingEl.remove();
+          appendChat('assistant', 'Sorry, something went wrong. Please try again.');
+        } finally {
+          document.getElementById('chat-send').disabled = false;
+          document.getElementById('chat-input').focus();
+        }
+      }
+
+      document.getElementById('chat-bubble').addEventListener('click', toggleChat);
+      document.getElementById('chat-close').addEventListener('click', toggleChat);
+      document.getElementById('chat-send').addEventListener('click', sendChat);
+      document.getElementById('chat-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+      });
+      // Auto-grow textarea
+      document.getElementById('chat-input').addEventListener('input', function () {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+      });
+    });
+  </script>
+</body>
+</html>

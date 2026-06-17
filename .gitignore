@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+.env
+.venv/
+.claude/
+.planning/
+.pytest_cache/README.md
+*.xlsx
+*.docx
