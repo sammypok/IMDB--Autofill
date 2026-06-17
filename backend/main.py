@@ -200,7 +200,7 @@ async def run_job(job_id: str, images_dir: str) -> None:
 # POST /upload
 # ---------------------------------------------------------------------------
 
-MAX_FILES_PER_UPLOAD = 50
+MAX_FILES_PER_UPLOAD = 500
 MAX_FILE_BYTES = 20 * 1024 * 1024  # 20 MB per file
 
 
